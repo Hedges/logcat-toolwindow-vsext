@@ -161,7 +161,7 @@ namespace LogcatToolWin
             outputProcess = new Process();
             string full_cmd = AdbExePath + " "; // "c:/Develop/Android/SDK/platform-tools/adb.exe "; // + cmd;
             outputProcess.StartInfo.FileName = full_cmd;
-            outputProcess.StartInfo.Arguments = cmd; // "/c DIR"; // Note the /c command (*)
+            //outputProcess.StartInfo.Arguments = cmd; // "/c DIR"; // Note the /c command (*)
             outputProcess.StartInfo.UseShellExecute = false;
             outputProcess.StartInfo.RedirectStandardOutput = true;
             outputProcess.StartInfo.RedirectStandardError = true;
@@ -235,6 +235,7 @@ namespace LogcatToolWin
                 DeviceName = tokens[0];
                 if (tokens[1] == "device") IsDeviceReady = true; else IsDeviceReady = false;
             }
+            IsDeviceReady = true;
             if (OnDeviceChecked != null)
             {
                 OnDeviceChecked(DeviceName, IsDeviceReady);
@@ -247,42 +248,42 @@ namespace LogcatToolWin
             if (outLine.Data == null) return;
 
             string msg = outLine.Data;
-            if ((msg == null) || (msg.Length <= 7)) return;
-            int time_split = msg.IndexOf(' ', 7);
-            if (time_split == -1) return;
-            string time_token = msg.Substring(0, time_split);
-            msg = msg.Substring(time_split + 1);
-            string level_token = msg.Substring(0, 1);
-            LogcatOutputToolWindowControl.LogcatItem.Level log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Verbose;
-            switch (level_token)
+
+            char[] separators = {' ', '[', ']'};
+            string[] tokens = msg.Split(separators, 8, System.StringSplitOptions.RemoveEmptyEntries);
+            if(tokens.Length < 7)
             {
-                case "V": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Verbose; break;
-                case "D": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Debug; break;
-                case "I": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Info; break;
-                case "W": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Warning; break;
-                case "E": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Error; break;
-                case "F": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Fatal; break;
+                return;
             }
-            msg = msg.Substring(2);
-            int tag_split = msg.IndexOf('(');
-            if (tag_split == -1) return;
-            string tag_token = msg.Substring(0, tag_split);
-            tag_token = tag_token.Trim();
-            msg = msg.Substring(tag_split + 1);
-            int pid_split = msg.IndexOf(')');
-            if (pid_split == -1) return;
-            string pid_token = msg.Substring(0, pid_split);
-            int pid = 0;
+
             try
             {
-                pid = System.Convert.ToInt32(pid_token);
+                string time_token = tokens[0] + " " + tokens[1] + " " + tokens[2];
+
+                string tag_token = tokens[4];
+
+                string pid_token = tokens[5];
+                int pid = System.Convert.ToInt32(pid_token);
+
+                string level_token = tokens[6];
+                LogcatOutputToolWindowControl.LogcatItem.Level log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Verbose;
+                switch (level_token)
+                {
+                    case "<Emergency>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Fatal; break;
+                    case "<Alert>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Fatal; break;
+                    case "<Critical>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Fatal; break;
+                    case "<Error>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Error; break;
+                    case "<Warning>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Warning; break;
+                    case "<Notice>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Verbose; break;
+                    case "<Info>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Info; break;
+                    case "<Debug>": log_level = LogcatOutputToolWindowControl.LogcatItem.Level.Debug; break;
+                }
+
+                string msg_token = tokens[7];
+
+                OnOutputLogcat(log_level, time_token, pid, tag_token, msg_token, outLine.Data);
             }
-            catch (Exception e)
-            {
-                Debug.WriteLine("pid exception " + e.Message);
-            }
-            string msg_token = msg.Substring(pid_split + 2);
-            OnOutputLogcat(log_level, time_token, pid, tag_token, msg_token, outLine.Data);
+            catch (Exception e) { }
         }
 
         public void AdbGrepPid(string package_name)
